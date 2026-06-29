@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>VK POS (True Cloud Edition)</title>
+<link rel="manifest" href="data:application/manifest+json;charset=utf-8,%7B%22name%22%3A%22VK%20POS%20System%22%2C%22short_name%22%3A%22VK%20POS%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23ffffff%22%2C%22theme_color%22%3A%22%2300bcd4%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22https%3A%2F%2Fcdn-icons-png.flaticon.com%2F512%2F6799%2F6799096.png%22%2C%22sizes%22%3A%22512x512%22%2C%22type%22%3A%22image%2Fpng%22%7D%5D%7D">
+<!-- Styles Sheet -->
+<link rel="stylesheet" href="/src/pos-styles.css">
+<!-- External SDKs -->
+<script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-storage-compat.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+</head>
+<body>
+<div id="toastContainer"></div><div id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
+<!-- Cloud Sync Loader Overlay -->
+<div id="cloudLoginOverlay" style="display: flex; position: fixed; top:0; left:0; width:100vw; height:100vh; background: rgba(0,0,0,0.8); z-index: 99999; justify-content: center; align-items: center; backdrop-filter: blur(5px);">
+  <div style="background: white; padding: 30px; border-radius: 12px; width: 90%; max-width: 350px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+    <h2 style="color: #00bcd4; margin-top: 0; margin-bottom: 5px;">VK POS Cloud ☁️</h2>
+    <p style="font-size: 0.85em; color: #666; margin-bottom: 20px;">Secure Cloud Sync</p>
+    <button onclick="loginWithGoogle()" style="width: 100%; padding: 12px; background: #fff; color: #555; border: 1px solid #ccc; border-radius: 6px; font-weight: bold; font-size: 1.1em; cursor: pointer; margin-bottom: 15px; display: flex; justify-content: center; align-items: center; gap: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+      <svg width="18" height="18" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+        <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.7 17.74 9.5 24 9.5z"></path>
+        <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"></path>
+        <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"></path>
+        <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"></path>
+      </svg>
+      Sign in with Google
+    </button>
+    <button onclick="document.getElementById('cloudLoginOverlay').style.display='none'" style="width: 100%; padding: 12px; background: #f5f5f5; color: #555; border: 1px solid #ccc; border-radius: 6px; font-weight: bold; cursor: pointer;">Bypass (Local Offline Mode)</button>
+  </div>
+</div>
+
+<!-- Welcome SplashScreen -->
+<div id="splashScreen">
+  <img src="https://www.dropbox.com/scl/fi/lt9478zc4rechduhk1o3z/km_20251211_480p_15f_20251211_001308.gif?rlkey=o3dhiu3ts3lolr7j0l6mvd28u&st=sr5xhv3a&raw=1" alt="VK POS Splash Logo">
+  <div class="splash-text">VK INTERACTIVES</div>
+</div>
+
+<!-- Watermark and details -->
+<div class="watermark-ui">VK_INTERACTIVES<br><span style="font-size: 0.8em; font-weight: normal;">v16.6.1-SaaS PRO</span></div>
+
+<!-- Sidebar Menu -->
+<div id="sidebar">
+  <div class="sidebar-header"><span>VK POS Menu</span><button onclick="toggleSidebar()" style="background:none; border:none; font-size:1.2em; cursor:pointer; color:#00bcd4;">✕</button></div>
+  <button class="sidebar-btn shift-btn-start" id="sbStartShiftBtn" onclick="toggleSidebar(); startShift();">🚀 Start Shift</button>
+  <button class="sidebar-btn shift-btn-close" id="sbCloseShiftBtn" onclick="toggleSidebar(); closeShift();" disabled>🔒 Close Shift</button>
+  <div style="background: #f0f0f0; height: 1px; margin: 10px 0;"></div>
+  <button class="sidebar-btn" onclick="toggleLayout(); toggleSidebar();">🖥️ Toggle Desktop View</button>
+  <button class="sidebar-btn" onclick="openPanelWithSidebar('parkedSalesPanel')">📁 Parked Sales (<span id="parkedSalesCount">0</span>)</button>
+  <button class="sidebar-btn" onclick="openPanelWithSidebar('calculatorPanel')">🧮 Calculator</button>
+  <button class="sidebar-btn" onclick="openPanelWithSidebar('inventoryManagementPanel')">📦 Stock & Arrivals</button>
+  <button class="sidebar-btn" onclick="openPanelWithSidebar('historyPanel')">📜 Transaction History</button>
+  <button class="sidebar-btn" onclick="openPanelWithSidebar('shiftHistoryPanel')">📄 Shift History</button>
+  <button class="sidebar-btn" onclick="openPanelWithSidebar('notesPanel')">📝 Daily Cash & Petty Expenses</button>
+  <button class="sidebar-btn" onclick="openPanelWithSidebar('dedicatedBillsPanel')" style="color: #e91e63; font-weight: bold;">💳 Dedicated Shop Bills & Credit</button>
+  <button class="sidebar-btn" onclick="openPanelWithSidebar('tagsPanel')">🏷️ Price Tags</button>
+  <button class="sidebar-btn" onclick="openPanelWithSidebar('remindersPanel')">⏰ Reminders & Tasks</button>
+  <button class="sidebar-btn" onclick="openPanelWithSidebar('softwareHealthPanel')" style="color: #673ab7; font-weight: bold;">🩺 Software Health & Terminal</button>
+  <div style="background: #f0f0f0; height: 1px; margin: 10px 0;"></div>
+  <div style="padding: 5px 20px; font-size: 0.75em; color: #aaa; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">SaaS Premium Tools</div>
+  <button class="sidebar-btn premium-btn" onclick="checkPremiumAndOpen('analysisPanel')">📈 Analytics & Insights</button>
+  <button class="sidebar-btn premium-btn" onclick="checkPremiumAndOpen('monthlyReportsPanel')">📅 Monthly Reports & Comparison</button>
+  <button class="sidebar-btn premium-btn" onclick="checkPremiumAndOpen('productionPanel')">🏭 Production Report</button>
+  <button class="sidebar-btn premium-btn" onclick="checkPremiumAndOpen('workersPanel')">👷 Worker Attendance</button>
+  <button class="sidebar-btn premium-btn" onclick="checkPremiumAndOpen('rawMaterialsPanel')">🌾 Raw Materials</button>
+  <button class="sidebar-btn premium-btn" onclick="checkPremiumAndOpen('chickenBillsPanel')">🍗 Chicken / Meat Bills</button>
+  <div style="background: #f0f0f0; height: 1px; margin: 10px 0;"></div>
+  <button class="sidebar-btn" onclick="openPanelWithSidebar('settingsPanel')">⚙️ System Settings</button>
+  <button class="sidebar-btn" onclick="document.getElementById('subscriptionModal').style.display='flex'; toggleSidebar();" style="background: #fff3e0; color: #ff9800; border-left: 4px solid #ff9800;">⭐ Subscription / Billing</button>
+</div>
+
+<!-- Main Application UI Container -->
+<div class="container" id="mainContainer">
+  <div class="header">
+    <button class="hamburger-btn" onclick="toggleSidebar()">☰</button>
+    <div id="mainHeaderTitle">VK POS</div>
+    <div class="header-search">
+      <input type="text" id="searchInput" placeholder="Search..." onkeyup="filterItems()">
+      <button class="search-btn" onclick="filterItems()">🔍</button>
+      <button onclick="togglePanel('calculatorPanel')" style="background: #ff5722; color: white; border: none; padding: 0 12px; cursor: pointer; border-left: 1px solid rgba(255,255,255,0.2);">🧮</button>
+      <button class="scan-btn" onclick="toggleAppFullScreen()" style="background: #673ab7; padding: 0 12px;">🖥️</button>
+    </div>
+    <div class="header-status-area">
+      <div id="liveSalesSnapshot">Today: ₹0.00</div>
+      <div id="cloudStatusBadge" style="background: #f44336; color: white; padding: 2px 6px; border-radius: 12px; font-size: 0.65em; font-weight: bold; white-space: nowrap;">🔴 Offline</div>
+    </div>
+  </div>
+  
+  <div class="favorites-bar" id="favoritesBar"></div>
+  
+  <div class="items-list" id="itemsList">
+    <p id="searchTip" style="grid-column: 1 / -1; text-align: center; color: #aaa; margin-top: 20px;">Type a name or barcode above to see product results.</p>
+  </div>
+  
+  <div class="cart" id="cart">
+    <div class="cart-scroll-area">
+      <div style="color: #333; padding-bottom: 5px;"><strong>Current Cart:</strong></div>
+      <div id="cartItems"></div>
+      <div class="total-summary" style="margin-top: 10px; border-top: 2px dashed #ccc; padding-top: 10px;">
+        <div class="total"><span style="font-weight: bold;">Subtotal:</span><span>₹<span id="subTotal">0.00</span></span></div>
+        <div class="total" id="taxRow" style="display:none; color: #ff9800; flex-direction:column; gap:4px; padding: 5px 0;">
+          <div style="display:flex; justify-content:space-between;"><span>CGST (<span id="cgstRateDisp">0</span>%):</span><span>₹<span id="cgstAmount">0.00</span></span></div>
+          <div style="display:flex; justify-content:space-between;"><span>SGST (<span id="sgstRateDisp">0</span>%):</span><span>₹<span id="sgstAmount">0.00</span></span></div>
+        </div>
+        <div class="total" style="font-size: 1.1em; margin-top: 5px; padding-top: 5px; border-top: 1px solid #eee;"><span style="font-weight: bold;">Subtotal:</span><span>₹<span id="grandTotal">0.00</span></span></div>
+      </div>
+    </div>
+    
+    <div class="cart-fixed-area">
+      <div class="payment-method-line" style="display:flex; justify-content:space-between; margin-bottom: 5px; align-items:center;">
+        <span>Payment Method:</span>
+        <select id="paymentMethod" onchange="calculateChange()">
+          <option value="Cash">Cash</option>
+          <option value="UPI">UPI / PhonePe</option>
+          <option value="Card">Card</option>
+          <option value="Credit">Customer Credit</option>
+        </select>
+      </div>
+      <div class="input-line" style="display:flex; justify-content:space-between; margin-bottom:8px; align-items:center;">
+        <span style="font-weight: bold;">Received (₹):</span>
+        <input type="number" id="moneyReceived" value="" placeholder="0.00" oninput="calculateChange()" step="0.01" min="0" onfocus="numpadTarget='moneyReceived'">
+      </div>
+      
+      <!-- Onscreen numpad -->
+      <div id="cartNumpad" style="display: none; flex-direction: column; gap: 5px; margin-bottom: 5px;">
+        <div style="display:flex; gap:5px;">
+          <button id="npModeCash" onclick="setNpMode('CASH')" style="flex:1; padding:8px; background:#4caf50; color:white; font-weight:bold; border:none; border-radius:6px; cursor:pointer;">CASH MODE</button>
+          <button id="npModeQty" onclick="setNpMode('QTY')" style="flex:1; padding:8px; background:#e0e0e0; color:#333; font-weight:bold; border:none; border-radius:6px; cursor:pointer;">QTY MODE</button>
+        </div>
+        <div class="numpad-grid">
+          <button class="numpad-btn" onclick="numpadInput('1')">1</button><button class="numpad-btn" onclick="numpadInput('2')">2</button><button class="numpad-btn" onclick="numpadInput('3')">3</button>
+          <button class="numpad-btn" onclick="numpadInput('4')">4</button><button class="numpad-btn" onclick="numpadInput('5')">5</button><button class="numpad-btn" onclick="numpadInput('6')">6</button>
+          <button class="numpad-btn" onclick="numpadInput('7')">7</button><button class="numpad-btn" onclick="numpadInput('8')">8</button><button class="numpad-btn" onclick="numpadInput('9')">9</button>
+          <button class="numpad-btn numpad-clear" onclick="numpadClear()">C</button><button class="numpad-btn" onclick="numpadInput('0')">0</button><button class="numpad-btn numpad-enter" onclick="handleCompleteSaleClick()">ENT</button>
+        </div>
+      </div>
+      
+      <div class="total change-line" id="changeLine" style="margin-top:0;">
+        <span id="changeLabel">Return Change:</span><span style="font-weight: bold;">₹<span id="remainingChange">0.00</span></span>
+      </div>
+      
+      <div style="display: flex; gap: 10px; margin-top: 10px;">
+        <button id="suspendSaleBtn" onclick="suspendSale()" style="flex: 1; padding: 10px; border-radius: 8px; border: none; background: #3f51b5; color: white; font-weight: bold; cursor: pointer;" disabled>Park Sale ⏸️</button>
+        <div style="position: relative; flex: 1;">
+          <button id="morePrintBtn" onclick="togglePrintMenu()" style="width: 100%; padding: 10px; border-radius: 8px; border: none; background: #607d8b; color: white; font-weight: bold; cursor: pointer;">🖨️ Print ▼</button>
+          <div id="printDropMenu" style="display:none; position: absolute; bottom: 100%; right: 0; background: white; box-shadow: 0 -4px 15px rgba(0,0,0,0.2); border-radius: 8px; padding: 10px; width: 200px; z-index: 100; flex-direction: column; gap: 8px; margin-bottom: 5px;">
+            <button onclick="printLastTransaction('bill'); togglePrintMenu();" style="padding: 10px; background: #ffc107; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Print Bill 🖨️</button>
+            <button onclick="printLastTransaction('token'); togglePrintMenu();" style="padding: 10px; background: #4caf50; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Print Token 🎫</button>
+            <button id="printLang1Btn" onclick="printLastTransaction('billLang1'); togglePrintMenu();" style="padding: 10px; background: #e91e63; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Print Bill (Tamil)</button>
+            <button id="printLang2Btn" onclick="printLastTransaction('billLang2'); togglePrintMenu();" style="padding: 10px; background: #9c27b0; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Print Bill (Hindi)</button>
+          </div>
+        </div>
+      </div>
+      <button id="completeSaleBtn" onclick="handleCompleteSaleClick()" disabled style="width: 100%; padding: 12px; margin-top: 8px; font-size: 1.1em; font-weight: bold; color: white; background: #4caf50; border: none; border-radius: 8px; box-shadow: 0 4px 0 #388e3c; cursor: pointer;">Complete Sale</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Dialogs and Panels -->
+<div id="inventoryManagementPanel" class="panel">
+  <div class="panel-header"><h4>Inventory Management 📦</h4><button onclick="togglePanel('inventoryManagementPanel')" class="panel-close-btn">Close ✕</button></div>
+  <!-- Populated by JS render -->
+</div>
+
+<div id="historyPanel" class="panel">
+  <div class="panel-header"><h4>Transaction History 📜</h4><button onclick="togglePanel('historyPanel')" class="panel-close-btn">Close ✕</button></div>
+  <div id="historyList"></div>
+</div>
+
+<div id="tagsPanel" class="panel">
+  <div class="panel-header"><h4>Price Tag Generator 🏷️</h4><button onclick="togglePanel('tagsPanel')" class="panel-close-btn">Close ✕</button></div>
+  <div style="padding: 15px;">
+    <div style="background: #e0f7fa; padding: 15px; border-radius: 8px; border: 1px solid #00bcd4; margin-bottom: 20px;">
+      <h5 style="margin-top: 0; color: #00bcd4;">Create Price Tag</h5>
+      <label style="font-size: 0.8em; font-weight: bold;">Search & Auto-Fill Item:</label>
+      <div style="position: relative; margin-bottom: 15px;">
+        <input type="text" id="tagQuickSearch" placeholder="Search Item Name..." oninput="showTagSuggestions(this.value)" onfocus="showTagSuggestions(this.value)" autocomplete="off" style="width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #ccc; box-sizing: border-box;" />
+        <div id="tagSuggestions" style="display:none; position:absolute; top:100%; left:0; right:0; background:white; border:1px solid #ccc; border-radius:4px; max-height:200px; overflow-y:auto; z-index:1000; box-shadow:0 4px 6px rgba(0,0,0,0.1);"></div>
+      </div>
+      <input type="text" id="tagName" placeholder="Item Name" style="width:100%; margin-bottom:10px; padding:10px; border-radius: 4px; border: 1px solid #ccc;">
+      <input type="text" id="tagDetail" placeholder="Optional Detail (e.g. 500g, Large)" style="width:100%; margin-bottom:10px; padding:10px; border-radius: 4px; border: 1px solid #ccc;">
+      <input type="number" id="tagPrice" placeholder="Price (₹)" style="width:100%; margin-bottom:12px; padding:10px; border-radius: 4px; border: 1px solid #ccc;">
+      <div style="margin-bottom: 12px;">
+        <label style="font-size: 0.8em; font-weight: bold; color: #555; display: block; margin-bottom: 4px;">Diet Preference:</label>
+        <select id="tagDiet" style="width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #ccc; background: #fff; font-size: 0.9em; box-sizing: border-box;">
+          <option value="">No Diet Indicator</option>
+          <option value="Egg Less">Egg Less</option>
+          <option value="Egg Added">Egg Added</option>
+        </select>
+      </div>
+      <label style="font-size: 0.8em; font-weight: bold;">Tag Text Size (px):</label>
+      <input type="number" id="tagTextSize" placeholder="24" value="24" style="width:100%; margin-bottom:15px; padding:10px; border-radius: 4px; border: 1px solid #ccc;">
+      <label style="font-size: 0.8em; font-weight: bold;">Print Size (Width x Height in mm):</label>
+      <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+        <input type="text" id="tagSizeW" placeholder="50" value="50" style="flex:1; padding:10px; border-radius: 4px; border: 1px solid #ccc;">
+        <span style="align-self: center;">x</span>
+        <input type="text" id="tagSizeH" placeholder="30" value="30" style="flex:1; padding:10px; border-radius: 4px; border: 1px solid #ccc;">
+      </div>
+      <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+        <div style="flex: 1;">
+          <label style="font-size: 0.8em; font-weight: bold;">Tag Font:</label>
+          <select id="tagFont" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #ccc; background: #fff;">
+            <option value="Arial, sans-serif">Arial</option>
+            <option value="'Courier New', monospace">Courier New</option>
+            <option value="'Times New Roman', serif">Times New Roman</option>
+          </select>
+        </div>
+        <div style="flex: 1;">
+          <label style="font-size: 0.8em; font-weight: bold;">Border Design:</label>
+          <select id="tagBorder" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #ccc; background: #fff;">
+            <option value="none">No Border</option>
+            <option value="1px solid #000">Solid Thin</option>
+            <option value="2px dashed #000">Dashed Line</option>
+            <option value="2px solid #000">Solid Medium</option>
+            <option value="4px solid #000">Solid Bold</option>
+            <option value="3px double #000">Double Fine</option>
+            <option value="6px double #000">Double Heavy</option>
+            <option value="2px dotted #000">Dotted Border</option>
+            <option value="1px solid #000; border-radius: 8px">Rounded Thin</option>
+            <option value="2px solid #000; border-radius: 12px">Rounded Medium</option>
+            <option value="4px solid #000; border-radius: 16px">Rounded Bold</option>
+            <option value="2px solid #000; border-radius: 20px 4px 20px 4px">Fancy Corner A</option>
+            <option value="2px solid #000; border-radius: 4px 20px 4px 20px">Fancy Corner B</option>
+            <option value="4px double #000; outline: 1px solid #000; outline-offset: -4px">Classic Frame</option>
+            <option value="3px solid #000; outline: 2px dashed #000; outline-offset: -6px">Vintage Frame</option>
+            <option value="4px groove #000">Groove Border</option>
+            <option value="4px ridge #000">Ridge Border</option>
+            <option value="none; border-left: 3px solid #000; border-right: 3px solid #000">Side Bars</option>
+            <option value="none; border-top: 3px solid #000; border-bottom: 3px solid #000">Top-Bottom Bars</option>
+            <option value="none; border-left: 6px solid #000; padding-left: 10px">Left Accent Bar</option>
+            <option value="none; border-bottom: 3px solid #000">Bottom Underline Accent</option>
+            <option value="none; border-left: 3px solid #000; border-right: 3px solid #000; border-radius: 10px">Bracket Style</option>
+            <option value="none; border-left: 5px double #000; border-right: 5px double #000">Double Bracket</option>
+            <option value="1px solid #ccc; border-left: 4px solid #000; border-right: 4px solid #000">Boxed Side Accent</option>
+            <option value="2px solid #000; box-shadow: 4px 4px 0px #000">Retro Shadow Accent</option>
+            <option value="1px solid #000; box-shadow: 2px 2px 0px #000">Light Retro Shadow</option>
+            <option value="2px dashed #000; box-shadow: 3px 3px 0px #000">Dashed Retro Shadow</option>
+            <option value="3px double #000; box-shadow: 4px 4px 0px #000">Double Retro Shadow</option>
+            <option value="3px solid #000; border-radius: 12px; box-shadow: 3px 3px 0px #000">Rounded Retro Shadow</option>
+            <option value="1px dashed #000; border-radius: 6px">Dashed Rounded</option>
+            <option value="1px dotted #000; border-radius: 6px">Dotted Rounded</option>
+            <option value="4px double #000; border-radius: 8px">Double Rounded</option>
+            <option value="6px double #000; border-radius: 12px">Double Heavy Rounded</option>
+            <option value="3px solid #000; border-style: solid none; border-radius: 15px">Pill Horizontal Accent</option>
+            <option value="3px solid #000; border-style: none solid; border-radius: 15px">Pill Vertical Accent</option>
+            <option value="2px solid #000; border-top-left-radius: 16px">Single Corner Leaf A</option>
+            <option value="2px solid #000; border-bottom-right-radius: 16px">Single Corner Leaf B</option>
+            <option value="2px solid #000; border-radius: 24px 0 24px 0">Leaf Style</option>
+            <option value="2px solid #000; border-radius: 0 24px 0 24px">Leaf Style Reverse</option>
+            <option value="1px solid #000; padding: 2px; outline: 1px dashed #000; outline-offset: -3px">Dashed Inset Border</option>
+            <option value="1px solid #000; padding: 3px; outline: 1px dotted #000; outline-offset: -4px">Dotted Inset Border</option>
+            <option value="3px solid #000; padding: 2px; outline: 1px solid #000; outline-offset: -3px">Double Solid Inset</option>
+            <option value="none; border-top: 4px solid #000; border-bottom: 1px solid #000">Heavy Top Thin Bottom</option>
+            <option value="none; border-top: 1px solid #000; border-bottom: 4px solid #000">Thin Top Heavy Bottom</option>
+            <option value="2px solid #000; border-left: 8px solid #000">Heavy Left Pillar Frame</option>
+            <option value="2px solid #000; border-right: 8px solid #000">Heavy Right Pillar Frame</option>
+            <option value="2px solid #000; border-left: 8px solid #000; border-right: 8px solid #000">Dual Heavy Pillar Frame</option>
+            <option value="4px double #000; border-left: 8px solid #000">Pillar Double Frame</option>
+            <option value="1px solid #000; outline: 3px double #000; outline-offset: -5px">Grand Royal Frame</option>
+            <option value="2px dashed #000; outline: 1px solid #000; outline-offset: -4px">Postal Ticket Style</option>
+            <option value="2px solid #000; border-radius: 12px; outline: 1px dashed #000; outline-offset: -5px">Modern Rounded Ticket</option>
+            <option value="4px solid #000; border-radius: 8px; outline: 2px double #000; outline-offset: -6px">Heavy Royal Frame</option>
+            <option value="1px solid #bbb; box-shadow: inset 0 0 6px #ccc; border-radius: 6px">Inset Soft Shadow</option>
+            <option value="1px solid #111; outline: 1px solid #222; outline-offset: 2px">Thin Outline Box</option>
+            <option value="2px solid #000; outline: 2px solid #000; outline-offset: 4px">Bold Outline Box</option>
+          </select>
+        </div>
+      </div>
+      <button onclick="saveTagSettings()" style="width: 100%; padding: 10px; background: #ff9800; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; margin-bottom: 10px;">💾 Save Tag Settings</button>
+      <button onclick="printPriceTag()" style="width: 100%; padding: 12px; background: #00bcd4; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer;">Print Tag 🖨️</button>
+    </div>
+  </div>
+</div>
+
+<div id="dedicatedBillsPanel" class="panel">
+  <div class="panel-header"><h4>Dedicated Shop Bills & Credit 💳</h4><button onclick="togglePanel('dedicatedBillsPanel')" class="panel-close-btn">Close ✕</button></div>
+  <div style="padding: 10px;">
+    <div style="background: #ffebee; padding: 15px; border-radius: 8px; border: 1px solid #f44336; margin-bottom: 15px;">
+      <h5 style="margin-top: 0; color: #d32f2f;">➕ Add New Customer Credit</h5>
+      <input type="text" id="newCreditName" placeholder="Customer Name" style="width: 100%; margin-bottom: 8px; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;">
+      <input type="text" id="newCreditDesc" placeholder="Items or Description" style="width: 100%; margin-bottom: 8px; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;">
+      <div style="display: flex; gap: 8px; margin-bottom: 10px;">
+        <input type="number" id="newCreditTotal" placeholder="Total Amount (₹)" style="flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;">
+        <input type="number" id="newCreditAdvance" placeholder="Advance Paid (₹)" style="flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;">
+      </div>
+      <button onclick="addNewCreditRecord()" style="width: 100%; padding: 10px; background: #e91e63; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer;">Save New Record</button>
+    </div>
+    <h5 style="margin-top: 0; color: #e91e63; border-bottom: 1px solid #eee; padding-bottom: 5px;">Active Credits:</h5>
+    <div id="creditsListDedicated"></div>
+    <hr style="border: none; border-top: 2px dashed #ccc; margin: 25px 0;">
+    <div style="margin-bottom: 15px; border-bottom: 1px dashed #ccc; padding-bottom: 10px;">
+      <h5 style="margin-top: 0; color: #4caf50;">Log New Dedicated Shop Bill/Expense:</h5>
+      <input type="text" id="billDescription" placeholder="Description (e.g., Gas Bill)" style="margin-bottom: 5px; width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #ccc; box-sizing: border-box;" />
+      <div class="bill-input-group" style="display: flex; gap: 5px;">
+        <input type="number" id="billTotal" placeholder="Total (₹)" min="0.01" step="0.01" style="flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 4px;">
+        <input type="number" id="billPaid" placeholder="Paid Now (₹)" value="0.00" min="0.00" step="0.01" style="flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 4px;">
+      </div>
+      <button class="add-bill-btn" onclick="addBill()" style="width: 100%; padding: 10px; background: #4caf50; color: white; border: none; border-radius: 8px; margin-top: 10px; font-weight: bold; cursor:pointer;">Add Bill/Outstanding</button>
+    </div>
+    <h5 style="margin-top: 0; color: #4caf50;">Outstanding Dedicated Shop Bills:</h5>
+    <div id="billsListDedicated"></div>
+  </div>
+</div>
+
+<div id="rawMaterialsPanel" class="panel">
+  <div class="panel-header"><h4>Raw Materials Inventory 🌾</h4><button onclick="togglePanel('rawMaterialsPanel')" class="panel-close-btn">Close ✕</button></div>
+  <div style="padding: 10px;">
+    <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
+      <button onclick="printRawMaterialsReport('en')" style="flex: 1; min-width: 120px; padding: 12px; background: #3f51b5; color: white; border: none; border-radius: 6px; font-weight: bold; font-size: 1em; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">🖨️ Report (Eng)</button>
+    </div>
+    <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
+      <div style="flex: 1; min-width: 100px; background: #e8f5e9; padding: 15px; border-radius: 8px; border: 1px solid #4caf50;"><h6 style="margin: 0; color: #2e7d32; font-size: 0.85em;">Value IN (Spent) 📉</h6><h3 style="margin: 5px 0 0 0; color: #1b5e20;">₹<span id="rawTotalIn">0.00</span></h3></div>
+      <div style="flex: 1; min-width: 100px; background: #ffebee; padding: 15px; border-radius: 8px; border: 1px solid #f44336;"><h6 style="margin: 0; color: #c62828; font-size: 0.85em;">Value OUT (Used) 📈</h6><h3 style="margin: 5px 0 0 0; color: #b71c1c;">₹<span id="rawTotalOut">0.00</span></h3></div>
+      <div style="flex: 1; min-width: 100px; background: #e3f2fd; padding: 15px; border-radius: 8px; border: 1px solid #2196f3;"><h6 style="margin: 0; color: #1565c0; font-size: 0.85em;">Current Stock Val 💰</h6><h3 style="margin: 5px 0 0 0; color: #0d47a1;">₹<span id="rawCurrentValue">0.00</span></h3></div>
+    </div>
+    
+    <div style="background: #f9f9f9; padding: 15px; border-radius: 8px; border: 1px solid #ccc; margin-bottom: 15px;">
+      <h5 style="margin-top: 0; color: #333;">➕ Create / Edit Raw Material</h5>
+      <div style="display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap;">
+        <input type="text" id="rawMatName" placeholder="Item Name" style="flex: 2; min-width: 120px; padding: 10px; border: 1px solid #ccc; border-radius: 4px;">
+        <input type="text" id="rawMatUnit" placeholder="Unit (kg, L)" style="flex: 1; min-width: 80px; padding: 10px; border: 1px solid #ccc; border-radius: 4px;">
+        <input type="number" id="rawMatPrice" placeholder="Rate" min="0" step="0.01" style="flex: 1; min-width: 80px; padding: 10px; border: 1px solid #ccc; border-radius: 4px;">
+      </div>
+      <button onclick="addRawMaterial()" style="width: 100%; padding: 10px; background: #00bcd4; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer;">Add Material</button>
+    </div>
+    
+    <div style="background: #fff3e0; padding: 15px; border-radius: 8px; border: 1px solid #ff9800; margin-bottom: 20px;">
+      <h5 style="margin-top: 0; color: #ff9800;">🔄 Update Daily Usage / Deliveries</h5>
+      <select id="rawMatSelect" style="width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px;"></select>
+      <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+        <select id="rawMatAction" style="flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 4px;">
+          <option value="in">➕ Stock IN (Received Delivery)</option>
+          <option value="out">➖ Stock OUT (Used / Sold)</option>
+        </select>
+        <input type="number" id="rawMatAmount" placeholder="Qty..." step="0.01" min="0" style="flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 4px;">
+      </div>
+      <button onclick="updateRawMaterialStock()" style="width:100%; padding:10px; background:#ff9800; color:white; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">Update Stock</button>
+    </div>
+    
+    <h5 style="margin-top:0;color:#3f51b5;">Materials Status List:</h5>
+    <div class="production-table-container">
+      <table class="prod-table">
+        <thead>
+          <tr>
+            <th style="width: 50px;">Select</th>
+            <th>Name</th>
+            <th>Stock</th>
+            <th>Price</th>
+            <th>Total Value</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="rawMatTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div id="settingsPanel" class="panel">
+  <div class="panel-header"><h4>System Settings ⚙️</h4><button onclick="togglePanel('settingsPanel')" class="panel-close-btn">Close ✕</button></div>
+  <div style="padding: 10px;">
+    <div class="input-line" style="display:flex; justify-content:space-between; margin-bottom:10px;"><span>Company Name:</span><input type="text" id="settingsCompanyName" style="width:60%;"></div>
+    <div class="input-line" style="display:flex; justify-content:space-between; margin-bottom:10px;"><span>Phone Number:</span><input type="text" id="settingsPhone" style="width:60%;"></div>
+    <div class="input-line" style="display:flex; justify-content:space-between; margin-bottom:10px;"><span>Email:</span><input type="text" id="settingsEmail" style="width:60%;"></div>
+    <div class="input-line" style="display:flex; justify-content:space-between; margin-bottom:10px;"><span>Address:</span><input type="text" id="settingsAddress" style="width:60%;"></div>
+    <div class="input-line" style="display:flex; justify-content:space-between; margin-bottom:10px;"><span>Tax ID / GSTIN:</span><input type="text" id="settingsLicense" style="width:60%;"></div>
+    <div class="input-line" style="display:flex; justify-content:space-between; margin-bottom:10px;"><span>Custom Tagline (Footer):</span><input type="text" id="settingsTagline" style="width:60%;"></div>
+    <div class="input-line" style="display:flex; justify-content:space-between; margin-bottom:10px;"><span>GST Rate (%):</span><input type="number" id="settingsGstRate" style="width:60%;"></div>
+    <div class="input-line" style="display:flex; justify-content:space-between; margin-bottom:10px;"><span>Instagram:</span><input type="text" id="settingsInsta" style="width:60%;"></div>
+    <div class="input-line" style="display:flex; justify-content:space-between; margin-bottom:10px;"><span>Facebook:</span><input type="text" id="settingsFB" style="width:60%;"></div>
+    <div class="input-line" style="display:flex; justify-content:space-between; margin-bottom:10px;"><span>Logo Print Size:</span><input type="number" id="settingsLogoSize" style="width:60%;"></div>
+    
+    <div style="text-align: center; margin-bottom: 15px;">
+      <span id="logoSizeDisplay">100px</span><br>
+      <img id="settingsLogoPreview" style="max-height:80px; max-width:120px; display:none; border:1px solid #ccc; margin-top:5px;">
+    </div>
+    
+    <div class="input-line" style="display:flex; justify-content:space-between; margin-bottom:10px;">
+      <span>Receipt Font:</span>
+      <select id="settingsFont" style="width:60%;">
+        <option value="'Courier New', monospace">Courier New</option>
+        <option value="'Segoe UI', sans-serif">Segoe UI</option>
+      </select>
+    </div>
+    <div class="input-line" style="display:flex; justify-content:space-between; margin-bottom:10px;">
+      <span>Default Item View:</span>
+      <select id="settingsItemView" style="width:60%;">
+        <option value="text">Text List Mode</option>
+        <option value="image">Image Grid Mode</option>
+        <option value="sanoft">Sanoft UI Mode</option>
+        <option value="vgrid">VGRID Keyboard Mode</option>
+      </select>
+    </div>
+    <div class="input-line" style="display:flex; justify-content:space-between; margin-bottom:10px;">
+      <span>Visual Theme:</span>
+      <select id="settingsTheme" style="width:60%;">
+        <option value="light">Classic Light (Teal)</option>
+        <option value="dark">Dark Slate</option>
+        <option value="twilight">Calm Twilight</option>
+        <option value="emerald">Forest Emerald</option>
+        <option value="sakura">Sakura Pink</option>
+        <option value="cyberpunk">Cyberpunk Neon</option>
+      </select>
+    </div>
+    <div class="input-line" style="display:flex; justify-content:space-between; margin-bottom:15px;">
+      <span>Cart Options:</span>
+      <label><input type="checkbox" id="settingsNumPad"> Show Onscreen Numpad</label>
+    </div>
+    
+    <div class="input-line" style="display:flex; justify-content:space-between; margin-bottom:10px;">
+      <span>Button 1 Lang:</span>
+      <select id="settingsLang1" style="width:60%;">
+        <option value="ta">Tamil (தமிழ்)</option>
+        <option value="hi">Hindi (हिंदी)</option>
+        <option value="en">English</option>
+      </select>
+    </div>
+    <div class="input-line" style="display:flex; justify-content:space-between; margin-bottom:10px;">
+      <span>Button 2 Lang:</span>
+      <select id="settingsLang2" style="width:60%;">
+        <option value="hi">Hindi (हिंदी)</option>
+        <option value="ta">Tamil (தமிழ்)</option>
+        <option value="en">English</option>
+      </select>
+    </div>
+    
+    <!-- Shift Toggles -->
+    <h5 style="color: #607d8b; border-top: 1px solid #ccc; padding-top: 10px; margin-top: 15px;">🖨️ Shift Report Print Toggles</h5>
+    <div style="display: grid; grid-template-columns: 1fr; gap: 8px; margin-bottom: 15px; background: #f0f8ff; padding: 15px; border-radius: 8px;">
+      <label><input type="checkbox" id="setSrSales"> Show Sales Summary</label>
+      <label><input type="checkbox" id="setSrExp"> Show Expenses</label>
+      <label><input type="checkbox" id="setSrAtt"> Show Attendance</label>
+      <label><input type="checkbox" id="setSrStock"> Show Closing Stock</label>
+      <label><input type="checkbox" id="setSrArr"> Show New Arrivals</label>
+      <label><input type="checkbox" id="setSrChart"> Show Daily Chart</label>
+      <label><input type="checkbox" id="setSrProdLoss"> Show Prod & Loss Track</label>
+    </div>
+    
+    <!-- Developer Mode -->
+    <h5 style="color: #00bcd4; border-top: 1px solid #ccc; padding-top: 10px; margin-top: 15px; display: flex; align-items: center; gap: 6px; font-weight: bold;">🛠️ Developer Mode</h5>
+    <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+      <div id="developerModeStatus" style="font-size: 0.85em; color: #64748b; font-weight: bold; margin-bottom: 8px; display: flex; align-items: center; gap: 4px;">Status: Disabled ❌</div>
+      <div class="input-line" style="display:flex; justify-content:space-between; align-items: center; gap: 8px;">
+        <input type="password" id="devPasswordInput" placeholder="Enter Developer Password" style="flex: 1; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.9em; box-sizing: border-box; background: white !important; color: black !important; outline: none;">
+        <button onclick="activateDeveloperMode()" style="padding: 10px 14px; background: #00bcd4; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 0.85em; transition: background 0.2s; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,188,212,0.25);">Activate</button>
+      </div>
+    </div>
+    
+    <button onclick="saveSettings()" style="width: 100%; padding: 12px; background: #4caf50; color: white; border: none; border-radius: 6px; font-weight: bold; cursor:pointer;">Save Settings 💾</button>
+  </div>
+</div>
+
+<div id="subscriptionModal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.8); z-index:10000000; justify-content:center; align-items:center; backdrop-filter: blur(5px);">
+  <div style="background:#fff; width:90%; max-width:450px; border-radius:12px; padding:30px; text-align:center; box-shadow:0 15px 35px rgba(0,0,0,0.2);">
+    <h2 style="color:#e91e63; margin-top:0;">Unlock True Power 🚀</h2>
+    <p style="color:#555; margin-bottom: 20px;">Upgrade to PRO to access Advanced Analytics, Worker Tracking, Raw Materials, and Production Reports.</p>
+    <button onclick="document.getElementById('subscriptionModal').style.display='none'" style="width:100%; padding:10px; background:#eee; color:#555; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">Maybe Later</button>
+  </div>
+</div>
+
+<div id="updatesModal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.6); z-index:10001; justify-content:center; align-items:center; backdrop-filter: blur(3px);">
+  <div style="background:#fff; width:90%; max-width:400px; border-radius:12px; padding:25px; box-shadow:0 15px 35px rgba(0,0,0,0.2); max-height:85vh; overflow-y:auto; position:relative;">
+    <h3 style="color:#03a9f4; margin-top:0; border-bottom:2px solid #e0f7fa; padding-bottom:10px;">🚀 What's New in v16.6.1</h3>
+    <p>System Integrity Restored: Shift History printing fixed with all options (new arrivals, sold items, expenses, chart, discrepancies) rendering dynamically from business settings toggles.</p>
+    <button onclick="document.getElementById('updatesModal').style.display='none'" style="width:100%; padding:12px; background:#f44336; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer; margin-top:15px;">Awesome, Let's Go!</button>
+  </div>
+</div>
+
+<div id="calculatorPanel" class="panel" style="background: #273043 !important; padding: 0 !important; overflow: hidden; display: flex; flex-direction: column;">
+  <div style="position: absolute; top: 10px; left: 10px; z-index: 10;">
+    <button onclick="togglePanel('calculatorPanel')" style="background: rgba(255,255,255,0.15); color: #fff; border: none; padding: 10px 20px; border-radius: 30px; cursor: pointer; font-weight: bold; font-size: 1.1em;">← Back</button>
+  </div>
+  <div class="calc-fullscreen-mode">
+    <div class="calc-display-section">
+      <input type="text" id="calcInput" style="width:100%; background:transparent; border:none; color:#ffffff; font-size:4.5em; text-align:right; outline:none; padding:0; margin:0;" value="0" readonly>
+      <div id="calcResult" style="color:#a0b2d8; font-size:2.5em; font-weight:300; text-align:right; min-height: 1.2em;"></div>
+    </div>
+    <div class="calc-keys-section">
+      <div class="calc-keys-left">
+        <button class="calc-btn sci" onclick="appendToDisplay('sin(')">sin</button>
+        <button class="calc-btn sci" onclick="appendToDisplay('cos(')">cos</button>
+        <button class="calc-btn sci" onclick="appendToDisplay('tan(')">tan</button>
+        <button class="calc-btn sci" onclick="appendToDisplay('log(')">log</button>
+        <button class="calc-btn sci" onclick="appendToDisplay('ln(')">In</button>
+        <button class="calc-btn sci" onclick="appendToDisplay('e')">e</button>
+        <button class="calc-btn sci" onclick="appendToDisplay('√(')">√</button>
+        <button class="calc-btn sci" onclick="appendToDisplay('π')">π</button>
+        <button class="calc-btn sci" onclick="appendToDisplay('^')">^</button>
+        <button class="calc-btn sci" onclick="appendToDisplay('!')">!</button>
+        <button class="calc-btn sci" onclick="appendToDisplay('(')">(</button>
+        <button class="calc-btn sci" onclick="appendToDisplay(')')">)</button>
+      </div>
+      <div class="calc-keys-right">
+        <button class="calc-btn ac-btn" onclick="clearDisplay()">AC</button>
+        <button class="calc-btn op" onclick="deleteLast()">⌫</button>
+        <button class="calc-btn op" onclick="appendToDisplay('%')">%</button>
+        <button class="calc-btn op" onclick="appendToDisplay('÷')">÷</button>
+        
+        <button class="calc-btn num" onclick="appendToDisplay('7')">7</button>
+        <button class="calc-btn num" onclick="appendToDisplay('8')">8</button>
+        <button class="calc-btn num" onclick="appendToDisplay('9')">9</button>
+        <button class="calc-btn op" onclick="appendToDisplay('×')">×</button>
+        
+        <button class="calc-btn num" onclick="appendToDisplay('4')">4</button>
+        <button class="calc-btn num" onclick="appendToDisplay('5')">5</button>
+        <button class="calc-btn num" onclick="appendToDisplay('6')">6</button>
+        <button class="calc-btn op" onclick="appendToDisplay('-')">-</button>
+        
+        <button class="calc-btn num" onclick="appendToDisplay('1')">1</button>
+        <button class="calc-btn num" onclick="appendToDisplay('2')">2</button>
+        <button class="calc-btn num" onclick="appendToDisplay('3')">3</button>
+        <button class="calc-btn op" onclick="appendToDisplay('+')">+</button>
+        
+        <button class="calc-btn num" style="grid-column: span 2;" onclick="appendToDisplay('0')">0</button>
+        <button class="calc-btn num" onclick="appendToDisplay('.')">.</button>
+        <button class="calc-btn primary" onclick="calculateResult()">=</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="workersPanel" class="panel">
+  <div class="panel-header"><h4>Worker Attendance & Payroll 👷</h4><button onclick="togglePanel('workersPanel')" class="panel-close-btn">Close ✕</button></div>
+  <div style="padding: 10px;">
+    <div style="background: #f0f8ff; padding: 15px; border-radius: 8px; border: 1px solid #00bcd4; margin-bottom: 15px;">
+      <h5 style="margin-top: 0; color: #00bcd4;">Add New Worker</h5>
+      <div style="display:flex; gap:10px;"><input type="text" id="newWorkerName" placeholder="Worker Name" style="flex:2; margin-bottom: 10px; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;"><input type="number" id="newWorkerAge" placeholder="Age" style="flex:1; margin-bottom: 10px; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;"></div>
+      <div style="display:flex; gap:10px;"><input type="text" id="newWorkerRole" placeholder="Role (e.g. Barista)" style="flex:2; margin-bottom: 10px; padding: 10px; border: 1px solid #ccc; border-radius: 4px;"><select id="newWorkerPayType" style="flex:1; margin-bottom:10px; padding:10px; border: 1px solid #ccc; border-radius: 4px;"><option value="hourly">Hourly Rate</option><option value="daily">Daily Wage</option></select><input type="number" id="newWorkerPayRate" placeholder="₹ Rate" style="flex:1; margin-bottom: 10px; padding: 10px; border: 1px solid #ccc; border-radius: 4px;"></div>
+      <button onclick="addNewWorker()" style="width: 100%; padding: 10px; background: #00bcd4; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer;">Add Worker</button>
+    </div>
+    <h5 style="margin-top: 0; padding-bottom: 5px; border-bottom: 1px solid #ccc;">Current Shift Dashboard</h5>
+    <div id="todayWorkersList"></div>
+  </div>
+</div>
+
+<div id="softwareHealthPanel" class="panel">
+  <div class="panel-header"><h4>System Diagnostics & Background Processes 🩺</h4><button onclick="togglePanel('softwareHealthPanel')" class="panel-close-btn">Close ✕</button></div>
+  <div style="padding: 15px; max-height: calc(100vh - 80px); overflow-y: auto;">
+    
+    <!-- Primary Real-Time Health Metrics -->
+    <div class="health-metrics" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; margin-bottom: 15px;">
+      <div class="metric-box" style="padding: 8px;">
+        <h6>Ping RTT (Real)</h6>
+        <p id="shDbPing" style="color:#4caf50; font-size: 1.1em;">Measuring...</p>
+      </div>
+      <div class="metric-box" style="padding: 8px;">
+        <h6>JS Heap Memory</h6>
+        <p id="shMemory" style="color:#4caf50; font-size: 1.1em;">Loading...</p>
+      </div>
+      <div class="metric-box" style="padding: 8px;">
+        <h6>Local DB Storage</h6>
+        <p id="shStorage" style="color:#2196f3; font-size: 1.1em;">0.00 KB</p>
+      </div>
+      <div class="metric-box" style="padding: 8px;">
+        <h6>Cart Items</h6>
+        <p id="shCartItems" style="color:#ff9800; font-size: 1.1em;">0 items</p>
+      </div>
+      <div class="metric-box" style="padding: 8px;">
+        <h6>Sync Connection</h6>
+        <p id="shSyncStatus" style="color:#4caf50; font-size: 1.1em;">Active</p>
+      </div>
+    </div>
+
+    <!-- System Specs & Real Hardware Info -->
+    <h5 style="margin: 15px 0 8px 0; border-bottom: 2px solid var(--theme-border, #eee); padding-bottom: 4px; display: flex; align-items: center; gap: 6px; font-weight: bold; font-size: 0.9em; color: var(--theme-primary, #00bcd4);">
+      🖥️ <span>Client System Configuration</span>
+    </h5>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.85em; background: rgba(0,0,0,0.03); padding: 10px; border-radius: 6px; margin-bottom: 15px; border: 1px solid var(--theme-border, #eee); color: var(--theme-text, #333);">
+      <div><b>Operating System:</b> <span id="shOS">Detecting...</span></div>
+      <div><b>CPU Logical Cores:</b> <span id="shCores">Detecting...</span></div>
+      <div><b>Screen Resolution:</b> <span id="shResolution">Detecting...</span></div>
+      <div><b>Navigator Language:</b> <span id="shLang">Detecting...</span></div>
+      <div><b>Network Connection:</b> <span id="shNetworkType" style="font-weight: bold; color: #4caf50;">Online</span></div>
+      <div><b>Browser Storage Quota:</b> <span id="shQuota">Calculating...</span></div>
+    </div>
+
+    <!-- Real Background Processes Daemon Table -->
+    <h5 style="margin: 15px 0 8px 0; border-bottom: 2px solid var(--theme-border, #eee); padding-bottom: 4px; display: flex; align-items: center; gap: 6px; font-weight: bold; font-size: 0.9em; color: var(--theme-primary, #00bcd4);">
+      ⚙️ <span>Active Background Services (Daemons)</span>
+    </h5>
+    <div style="overflow-x: auto; margin-bottom: 15px; border: 1px solid var(--theme-border, #eee); border-radius: 6px;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 0.8em; text-align: left; color: var(--theme-text, #333);">
+        <thead>
+          <tr style="background: rgba(0,0,0,0.05); border-bottom: 1px solid var(--theme-border, #eee);">
+            <th style="padding: 8px;">Service Name</th>
+            <th style="padding: 8px;">Execution Interval</th>
+            <th style="padding: 8px;">Avg CPU / Overhead</th>
+            <th style="padding: 8px;">Current State</th>
+          </tr>
+        </thead>
+        <tbody id="shDaemonsTable">
+          <!-- Dynamic row updates -->
+          <tr style="border-bottom: 1px solid var(--theme-border, #eee);">
+            <td style="padding: 8px; font-weight: bold;">🛒 Cart Persistence Watchdog</td>
+            <td style="padding: 8px;">On Change</td>
+            <td style="padding: 8px;">&lt;0.01 ms</td>
+            <td style="padding: 8px;"><span style="background: #e8f5e9; color: #2e7d32; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; font-weight: bold;">● ACTIVE</span></td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--theme-border, #eee);">
+            <td style="padding: 8px; font-weight: bold;">🔥 Firestore Cloud Sync Agent</td>
+            <td style="padding: 8px;">Immediate (Push)</td>
+            <td style="padding: 8px;" id="shCpuSync">0.11 ms</td>
+            <td style="padding: 8px;"><span style="background: #e8f5e9; color: #2e7d32; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; font-weight: bold;">● ACTIVE</span></td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--theme-border, #eee);">
+            <td style="padding: 8px; font-weight: bold;">⏰ Calendar Reminders Checker</td>
+            <td style="padding: 8px;">Every 5.0s</td>
+            <td style="padding: 8px;" id="shCpuRem">0.02 ms</td>
+            <td style="padding: 8px;"><span style="background: #e8f5e9; color: #2e7d32; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; font-weight: bold;">● ACTIVE</span></td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--theme-border, #eee);">
+            <td style="padding: 8px; font-weight: bold;">📊 Stock Level Threshold Auditor</td>
+            <td style="padding: 8px;">On Transaction</td>
+            <td style="padding: 8px;">0.15 ms</td>
+            <td style="padding: 8px;"><span style="background: #fff3e0; color: #e65100; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; font-weight: bold;">● STANDBY</span></td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--theme-border, #eee);">
+            <td style="padding: 8px; font-weight: bold;">🗑️ Memory Garbage Collector</td>
+            <td style="padding: 8px;">Automatic</td>
+            <td style="padding: 8px;">Dynamic</td>
+            <td style="padding: 8px;"><span style="background: #e8f5e9; color: #2e7d32; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; font-weight: bold;">● ACTIVE</span></td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--theme-border, #eee);">
+            <td style="padding: 8px; font-weight: bold;">⌨️ VGRID Keyboard Polling Router</td>
+            <td style="padding: 8px;">Event Driven</td>
+            <td style="padding: 8px;">&lt;0.01 ms</td>
+            <td style="padding: 8px;"><span id="shVgridStatus" style="background: #e8f5e9; color: #2e7d32; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; font-weight: bold;">● ACTIVE</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Live Event Terminal Feed -->
+    <h5 style="margin: 15px 0 8px 0; border-bottom: 2px solid var(--theme-border, #eee); padding-bottom: 4px; display: flex; align-items: center; justify-content: space-between; font-weight: bold; font-size: 0.9em; color: var(--theme-primary, #00bcd4);">
+      <span style="display: flex; align-items: center; gap: 6px;">📋 <span>Live Diagnostic Logs Feed</span></span>
+      <button onclick="document.getElementById('liveTerminal').innerHTML='';" style="background: transparent; border: none; color: #ff5722; font-size: 0.85em; cursor: pointer; padding: 2px 5px;">Clear Log ✕</button>
+    </h5>
+    <div class="terminal-container" id="liveTerminal" style="height: 180px;"></div>
+  </div>
+</div>
+
+<div id="parkedSalesPanel" class="panel">
+  <div class="panel-header"><h4>Parked Sales 📁</h4><button onclick="togglePanel('parkedSalesPanel')" class="panel-close-btn">Close ✕</button></div>
+  <div id="parkedSalesList"></div>
+</div>
+
+<div id="shiftHistoryPanel" class="panel">
+  <div class="panel-header"><h4>Shift History 📄</h4><button onclick="togglePanel('shiftHistoryPanel')" class="panel-close-btn">Close ✕</button></div>
+  <div id="shiftsList"></div>
+</div>
+
+<div id="viewShiftModal" class="panel">
+  <div class="panel-header"><h4>Shift Details 👁️</h4><button onclick="togglePanel('viewShiftModal')" class="panel-close-btn">Close ✕</button></div>
+  <div id="viewShiftContent"></div>
+</div>
+
+<div id="productionPanel" class="panel">
+  <div class="panel-header"><h4>Production Report 🏭</h4><button onclick="togglePanel('productionPanel')" class="panel-close-btn">Close ✕</button></div>
+  <div id="productionContent"></div>
+</div>
+
+<div id="analysisPanel" class="panel">
+  <div class="panel-header"><h4>Analytics & Insights 📈</h4><button onclick="togglePanel('analysisPanel')" class="panel-close-btn">Close ✕</button></div>
+  <div class="date-filters" style="padding: 10px; background: #e0f7fa; border-radius: 8px; margin-bottom: 15px;">
+    <p id="analysisDateRangeLabel" style="text-align: center; font-weight: bold; margin: 0; color: #00bcd4;"></p>
+    <div style="display: flex; gap: 5px; margin-bottom: 5px;">
+      <input type="date" id="startDateInput" style="flex: 1;"><input type="date" id="endDateInput" style="flex: 1;">
+    </div>
+    <button onclick="renderAnalysisPanel()" style="width: 100%; padding: 10px; background: #ff5722; color: white; border: none; border-radius: 6px; cursor:pointer;">Filter by Date</button>
+  </div>
+  <div id="analysisContent"></div>
+</div>
+
+<div id="monthlyReportsPanel" class="panel">
+  <div class="panel-header"><h4>Monthly Reports & Comparison 📅</h4><button onclick="togglePanel('monthlyReportsPanel')" class="panel-close-btn">Close ✕</button></div>
+  <div style="padding: 15px;">
+    <div style="background: #e0f7fa; padding: 15px; border-radius: 8px; border: 1px solid #00bcd4; margin-bottom: 15px;">
+      <h5 style="margin-top: 0; color: #00838f; margin-bottom: 10px;">Select Reporting Period</h5>
+      <div style="display: flex; gap: 10px; margin-bottom: 12px;">
+        <div style="flex: 1;">
+          <label style="font-size: 0.85em; font-weight: bold; color: #555; display: block; margin-bottom: 4px;">Year:</label>
+          <select id="monthlyReportYearSelect" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #ccc; background: white;">
+            <option value="2026" selected>2026</option>
+            <option value="2025">2025</option>
+            <option value="2027">2027</option>
+          </select>
+        </div>
+        <div style="flex: 1;">
+          <label style="font-size: 0.85em; font-weight: bold; color: #555; display: block; margin-bottom: 4px;">Month:</label>
+          <select id="monthlyReportMonthSelect" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #ccc; background: white;">
+            <option value="0">January</option>
+            <option value="1">February</option>
+            <option value="2">March</option>
+            <option value="3" selected>April</option>
+            <option value="4">May</option>
+            <option value="5">June</option>
+            <option value="6">July</option>
+            <option value="7">August</option>
+            <option value="8">September</option>
+            <option value="9">October</option>
+            <option value="10">November</option>
+            <option value="11">December</option>
+          </select>
+        </div>
+      </div>
+      <div style="display: flex; gap: 10px;">
+        <button onclick="renderMonthlyReportsPanel()" style="flex: 1; padding: 10px; background: #00bcd4; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">📊 Generate Report</button>
+        <button onclick="printMonthlyReport()" style="padding: 10px 14px; background: #4caf50; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 6px;">🖨️ Print</button>
+      </div>
+    </div>
+    <div id="monthlyReportPreviewContainer">
+      <p style="text-align: center; color: #888; font-style: italic; margin-top: 30px;">Click "Generate Report" to view monthly details and print.</p>
+    </div>
+  </div>
+</div>
+
+<div id="notesPanel" class="panel">
+  <div class="panel-header"><h4>Daily Cash & Petty Expenses 📝</h4><button onclick="togglePanel('notesPanel')" class="panel-close-btn">Close ✕</button></div>
+  <div class="daily-pay-section">
+    <h5 style="margin-top: 0; color: #ff5722;">Log Daily Cash In/Out (Pay/Expense)</h5>
+    <input type="text" id="dailyPayDescription" placeholder="Description (e.g., Paid driver, Owner cash-in)" style="width: 100%; padding: 10px; margin-bottom: 5px; box-sizing: border-box;" />
+    <div class="daily-pay-inputs" style="display: flex; gap: 5px; align-items: center;">
+      <input type="number" id="dailyPayAmount" placeholder="Amount (₹)" min="0.01" step="0.01" style="flex: 1;" />
+      <select id="dailyPayType" style="flex: 1;">
+        <option value="Expense">Cash Out/Expense (-)</option>
+        <option value="PayIn">Owner Cash In (+)</option>
+      </select>
+    </div>
+    <button onclick="addDailyPayNote()" style="width:100%; padding:10px; background:#ff5722; color:white; border:none; margin-top:8px; border-radius:4px; font-weight:bold; cursor:pointer;">Log Daily Pay/Expense</button>
+    <h5 style="margin-top: 15px; border-top: 1px dashed #ccc; padding-top: 10px;">Today's Cash Log</h5>
+    <div id="dailyPayLog"></div>
+    <div class="daily-cash-balance-section">
+      <h5 style="margin-top: 0; color: #ff9800;">💰 Calculate Today's Net Cash Balance</h5>
+      <div style="margin-bottom: 10px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px;">
+          <label style="font-size: 0.8em; font-weight: bold; color: #333; margin:0;">Total Manual UPI Counted (₹):</label>
+          <div style="display: flex; align-items: center; gap: 5px; background: #ffe0b2; padding: 2px 8px; border-radius: 4px;">
+            <input type="checkbox" id="overrideUpiCheckbox" onchange="calculateDailyCashBalance(); saveFormulaPreference();" style="width: 16px; height: 16px; margin: 0; cursor: pointer;">
+            <label for="overrideUpiCheckbox" style="font-size: 0.8em; color: #d32f2f; font-weight: bold; cursor: pointer;">Override Auto-UPI</label>
+          </div>
+        </div>
+        <input type="number" id="manualUpiInput" placeholder="Enter UPI total from phone..." style="width: 100%; padding: 10px; margin-bottom: 10px; border: 2px solid #ff9800; background: #fff !important;" oninput="calculateDailyCashBalance()">
+        <label style="font-size: 0.8em; font-weight: bold; display: block; margin-bottom: 5px; color: #333;">Select Calculation Formula:</label>
+        <select id="balanceFormula" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #ff9800; background: #fff;" onchange="calculateDailyCashBalance(); saveFormulaPreference();">
+          <option value="1">Cash Sales + PayIn - Expenses (Standard)</option>
+          <option value="2">All Sales (Cash + UPI) - Expenses</option>
+          <option value="3">Starting Cash + Cash Sales - Expenses</option>
+        </select>
+        <div id="customFormulaGrid" style="display:none; margin-top: 10px; background: #fff; padding: 10px; border: 1px dashed #ff9800; border-radius: 4px;">
+          <label style="display:block; margin-bottom:5px;"><input type="checkbox" id="cfCash" onchange="calculateDailyCashBalance(); saveFormulaPreference();"> ➕ Add Cash Sales</label>
+          <label style="display:block; margin-bottom:5px;"><input type="checkbox" id="cfUPI" onchange="calculateDailyCashBalance(); saveFormulaPreference();"> ➕ Add UPI Sales</label>
+          <label style="display:block; margin-bottom:5px;"><input type="checkbox" id="cfStart" onchange="calculateDailyCashBalance(); saveFormulaPreference();"> ➕ Add Starting Cash</label>
+          <label style="display:block; margin-bottom:5px;"><input type="checkbox" id="cfPayIn" onchange="calculateDailyCashBalance(); saveFormulaPreference();"> ➕ Add PayIns</label>
+          <label style="display:block;"><input type="checkbox" id="cfExp" onchange="calculateDailyCashBalance(); saveFormulaPreference();"> ➖ Subtract Expenses</label>
+        </div>
+      </div>
+      <button onclick="calculateDailyCashBalance()" style="width: 100%; padding: 10px; background: #ff9800; color: white; border: none; border-radius: 8px; font-weight: bold; cursor:pointer;">Recalculate Balance</button>
+      <div id="dailyCashBalanceResult"></div>
+    </div>
+  </div>
+</div>
+
+<div id="remindersPanel" class="panel">
+  <div class="panel-header"><h4>Reminders & Tasks ⏰</h4><button onclick="togglePanel('remindersPanel')" class="panel-close-btn">Close ✕</button></div>
+  <div style="padding: 10px;">
+    <div style="background: #fff3e0; padding: 15px; border-radius: 8px; border: 1px solid #ff9800; margin-bottom: 15px;">
+      <h5 style="margin-top: 0; color: #e65100;">➕ Add New Reminder</h5>
+      <input type="text" id="reminderText" placeholder="Task or item to remember..." style="width: 100%; margin-bottom: 10px; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;">
+      <input type="datetime-local" id="reminderDate" style="width: 100%; margin-bottom: 10px; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;">
+      <button onclick="addNewReminder()" style="width: 100%; padding: 10px; background: #ff9800; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer;">Save New Reminder</button>
+    </div>
+    <h5 style="margin-top: 0; color: #e65100; border-bottom: 1px solid #eee; padding-bottom: 5px;">Active Tasks / Alarms:</h5>
+    <div id="remindersList"></div>
+  </div>
+</div>
+
+<div id="chickenBillsPanel" class="panel">
+  <div class="panel-header"><h4>Chicken & Meat Yield Calculator 🍗</h4><button onclick="togglePanel('chickenBillsPanel')" class="panel-close-btn">Close ✕</button></div>
+  <div style="padding: 15px;">
+    <div style="background: #ffebee; padding: 15px; border-radius: 8px; border: 1px solid #f44336; margin-bottom: 15px;">
+      <h5 style="margin-top: 0; color: #d32f2f;">Calculate Meat Yield & Cost</h5>
+      <input type="text" id="meatSupplier" placeholder="Supplier Name" style="width: 100%; padding: 10px; margin-bottom: 10px; border-radius: 4px; border: 1px solid #ccc; box-sizing: border-box;">
+      <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+        <input type="number" id="meatLiveWeight" placeholder="Live Weight (kg)" style="flex:1; padding: 10px; border-radius: 4px; border: 1px solid #ccc; box-sizing: border-box;" oninput="calcMeatYield()">
+        <input type="number" id="meatPricePerKg" placeholder="Price/kg (Live) ₹" style="flex:1; padding: 10px; border-radius: 4px; border: 1px solid #ccc; box-sizing: border-box;" oninput="calcMeatYield()">
+      </div>
+      <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+        <input type="number" id="meatDressedWeight" placeholder="Dressed Weight (kg)" style="flex:1; padding: 10px; border-radius: 4px; border: 1px solid #ccc; box-sizing: border-box;" oninput="calcMeatYield()">
+      </div>
+      <div style="background: #fff; padding: 10px; border-radius: 4px; margin-bottom: 10px;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;"><span>Total Invoice Cost:</span> <b id="meatTotalCost">₹0.00</b></div>
+        <div style="display: flex; justify-content: space-between; color: #f44336; margin-bottom: 5px;"><span>Total Wastage:</span> <b id="meatWastage">0.00 kg (0%)</b></div>
+        <div style="display: flex; justify-content: space-between; color: #4caf50;"><span>Effective Cost (Dressed):</span> <b id="meatEffectiveCost" style="font-size: 1.2em;">₹0.00 /kg</b></div>
+      </div>
+      <button onclick="logChickenBill()" style="width: 100%; padding: 12px; background: #d32f2f; color: white; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">Log to Expenses & Raw Materials Stock</button>
+    </div>
+  </div>
+</div>
+
+<div id="receiptOutput"></div>
+
+<!-- Scripts Bundle (Deffered load to prevent blocking) -->
+<script src="/src/pos-logic.js" defer></script>
+<script src="/src/pos-inventory-logic.js" defer></script>
+</body>
+</html>
